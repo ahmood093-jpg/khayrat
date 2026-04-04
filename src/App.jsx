@@ -4744,7 +4744,7 @@ function AdminPanel({products,setProducts,customers,onLogout}){
     try{
       const res=await fetch("https://api.anthropic.com/v1/messages",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
         body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:30,messages:[{role:"user",content:`صنّف المنتج (اكتب الفئة فقط من هذه):\n${CATS.join("، ")}\nالمنتج: ${name} - ${brand}`}]}),
       });
       const d=await res.json();
