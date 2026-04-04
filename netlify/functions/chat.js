@@ -15,7 +15,7 @@ exports.handler = async (event) => {
     return { statusCode: 405, body: "Method Not Allowed" };
   }
 
-  const API_KEY = process.env.ANTHROPIC_KEY;
+  const API_KEY = process.env.ANTHROPIC_API_KEY;
 
   try {
     const body = JSON.parse(event.body);
