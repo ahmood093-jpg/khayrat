@@ -4443,9 +4443,9 @@ ${products.map(p=>`[${p.id}] ${p.name} - ${p.brand} - ${p.price}ريال${p.offe
 
 عند اقتراح منتجات اكتب في نهاية ردك: PRODUCTS:[{"id":"xx"}]`;
     try{
-      const res=await fetch("https://api.anthropic.com/v1/messages",{
+      const res=await fetch("/.netlify/functions/chat",{
         method:"POST",
-        headers:{"Content-Type":"application/json","x-api-key":"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","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
+        headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
         body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,system:SYS,messages:newMsgs.map(m=>({"role":m.role,"content":m.text}))}),
       });
       const d=await res.json();
