@@ -4439,7 +4439,7 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
 العميل: ${customer.name} | نقاطه: ${customer.points} | مستواه: ${getLevel(customer.points).name}
 
 المنتجات المتاحة عندنا:
-${products.map(p=>`[${p.id}] ${p.name} - ${p.brand} - ${p.price}ريال${p.offer?` (عرض: ${p.offerPrice}ريال)`:""} - ${p.unit} - ${p.cat}`).join("\n")}
+${products.map(p=>`${p.name} - ${p.price}ر - ${p.cat}`).join("\n")}
 
 عند اقتراح منتجات اكتب في نهاية ردك: PRODUCTS:[{"id":"xx"}]`;
     try{
