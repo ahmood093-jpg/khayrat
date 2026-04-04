@@ -4446,7 +4446,7 @@ ${products.map(p=>`[${p.id}] ${p.name} - ${p.brand} - ${p.price}ريال${p.offe
       const res=await fetch("/.netlify/functions/chat",{
         method:"POST",
         headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,system:SYS.slice(0,100000),messages:newMsgs.map(m=>({"role":m.role,"content":m.text}))}),
+        body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,system:SYS.slice(0,600000),messages:newMsgs.map(m=>({"role":m.role,"content":m.text}))}),
       });
       const d=await res.json();
       let reply=d?.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
