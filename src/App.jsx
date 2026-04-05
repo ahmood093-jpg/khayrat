@@ -4070,6 +4070,7 @@ function LoyaltyCard({customer}){
         <div>
           <div style={{fontSize:11,color:T.sub,marginBottom:3}}>أسواق خيرات السبتي</div>
           <div style={{fontWeight:900,fontSize:18,color:T.text}}>{customer.name}</div>
+          <div style={{fontSize:10,color:T.sub,marginTop:1}}>🆔 {customer.id}</div>
         </div>
         <div style={{textAlign:"center"}}>
           <div style={{fontSize:34}}>{lvl.icon}</div>
@@ -4098,9 +4099,11 @@ function LoginScreen({onLogin}){
   const[err,setErr]=useState("");
   const[shake,setShake]=useState(false);
 
+  const[phone,setPhone]=useState("");
   const doUser=()=>{
     if(!name.trim()){setErr("اكتب اسمك أولاً");return;}
-    onLogin("user",name.trim());
+    if(!phone.trim()||phone.replace(/\D/g,"").length<9){setErr("اكتب رقم جوالك صح");return;}
+    onLogin("user",name.trim(),phone.trim());
   };
   const doAdmin=()=>{
     if(pass==="admin123")onLogin("admin");
@@ -4137,8 +4140,14 @@ function LoginScreen({onLogin}){
             <div style={{fontSize:13,color:T.sub,marginBottom:22}}>اكتب اسمك وابدأ التسوق</div>
             <div style={{marginBottom:8}}>
               <div style={{fontSize:12,color:T.sub,marginBottom:6}}>اسمك</div>
-              <input value={name} onChange={e=>setName(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doUser()} placeholder="مثال: محمد العتيبي" autoFocus
-                style={{width:"100%",background:"rgba(255,255,255,0.08)",border:`1.5px solid ${err?"#ef4444":T.border}`,borderRadius:14,padding:"13px 16px",color:T.text,fontSize:16,outline:"none",boxSizing:"border-box",transition:"border 0.2s"}}
+              <input value={name} onChange={e=>setName(e.target.value)} placeholder="مثال: محمد العتيبي" autoFocus
+                style={{width:"100%",background:"rgba(255,255,255,0.08)",border:`1.5px solid ${T.border}`,borderRadius:14,padding:"13px 16px",color:T.text,fontSize:16,outline:"none",boxSizing:"border-box",transition:"border 0.2s",marginBottom:12}}
+                onFocus={e=>e.target.style.border=`1.5px solid ${T.primary}`}
+                onBlur={e=>e.target.style.border=`1.5px solid ${T.border}`}
+              />
+              <div style={{fontSize:12,color:T.sub,marginBottom:6}}>رقم الجوال</div>
+              <input value={phone} onChange={e=>setPhone(e.target.value)} onKeyDown={e=>e.key==="Enter"&&doUser()} placeholder="05XXXXXXXX" type="tel"
+                style={{width:"100%",background:"rgba(255,255,255,0.08)",border:`1.5px solid ${err?"#ef4444":T.border}`,borderRadius:14,padding:"13px 16px",color:T.text,fontSize:16,outline:"none",boxSizing:"border-box",transition:"border 0.2s",direction:"ltr"}}
                 onFocus={e=>e.target.style.border=`1.5px solid ${T.primary}`}
                 onBlur={e=>e.target.style.border=`1.5px solid ${T.border}`}
               />
@@ -4490,12 +4499,19 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
       ? relatedProds.map(p=>`[${p.barcode}] ${p.name_ar} - ${p.brand||""} - ${p.price}ريال - ${p.category_sub_ar||p.category_main_ar}`).join("\n")
       : "لا توجد منتجات مطابقة في قاعدة البيانات";
 
+    const cartTotal=Object.values(cart||{}).reduce((s,p)=>s+(p.offer?p.offerPrice:p.price),0);
+    const deliveryMsg=cartTotal>0&&cartTotal<50?`🚚 تنبيه: العميل محتاج ${(50-cartTotal).toFixed(2)} ريال فقط للتوصيل المجاني! رغّبه بمنتج إضافي.`:"";
+    const days=["الأحد","الاثنين","الثلاثاء","الأربعاء","الخميس","الجمعة","السبت"];
+    const todayName=days[new Date().getDay()];
     const SYS=`أنت عمر، مساعد تسوق ذكي وخبير طبخ في أسواق خيرات السبتي. شخصيتك ودودة، حيوية، وتسويقية.
 
 🎯 مهامك:
 1. **وصفات شهية** — لما يطلب العميل وصفة، اعطه طريقة تحضير ممتعة ومفصّلة
 2. **مساعد تسوق ذكي** — اربط كل مكون بمنتج من قائمتنا مع السعر
 3. **ترغيب وتشويق** — استخدم أسلوب تسويقي ممتع يشجع على الشراء
+4. **وجبة اليوم** — إذا سأل عن وجبة اليوم أو "وش أطبخ اليوم"، اقترح وجبة مناسبة ليوم ${todayName}
+5. **قائمة أسبوعية** — إذا طلب "قائمة أسبوعية" أو "مشتريات الأسبوع"، اقترح قائمة تسوق كاملة لأسبوع بالمنتجات والأسعار
+6. **تخصيص ذكي** — تذكر اهتمامات العميل وتفضيلاته من المحادثة واقترح بناء عليها
 
 📝 عند طلب وصفة، رد بهذا الترتيب:
 أولاً: مقدمة شهية ومشوّقة عن الوصفة 🍽️
@@ -4504,7 +4520,9 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
 رابعاً: نصيحة أو سر الطبخ
 خامساً: دعوة للشراء بأسلوب لطيف
 
-العميل: ${customer.name} | نقاطه: ${customer.points} | مستواه: ${getLevel(customer.points).name}
+${deliveryMsg}
+
+العميل: ${customer.name} | رقم العضوية: ${customer.id} | نقاطه: ${customer.points} | مستواه: ${getLevel(customer.points).name} | انضم: ${customer.joinDate||"جديد"}
 
 المنتجات المتاحة المتعلقة بطلب العميل:
 ${prodsText}
@@ -5201,7 +5219,7 @@ function AdminPanel({products,setProducts,customers,onLogout}){
               })}
             </div>
             {customers.length>0&&(
-              <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16}}>
+              <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:16,padding:16,marginBottom:14}}>
                 <div style={{fontWeight:800,fontSize:12,marginBottom:12,color:T.sec}}>🏆 أفضل العملاء</div>
                 {[...customers].sort((a,b)=>(b.totalSpent||0)-(a.totalSpent||0)).slice(0,5).map((c,i)=>{
                   const lvl=getLevel(c.points);
@@ -5209,13 +5227,65 @@ function AdminPanel({products,setProducts,customers,onLogout}){
                     <div key={c.id} style={{display:"flex",alignItems:"center",gap:10,padding:"7px 0",borderBottom:`1px solid ${T.border}`}}>
                       <div style={{width:22,height:22,borderRadius:"50%",background:"rgba(255,255,255,0.08)",display:"flex",alignItems:"center",justifyContent:"center",fontSize:11,fontWeight:800,flexShrink:0}}>{i+1}</div>
                       <div style={{fontSize:16}}>{lvl.icon}</div>
-                      <div style={{flex:1}}><div style={{fontWeight:600,fontSize:13}}>{c.name}</div><div style={{fontSize:10,color:T.sub}}>{c.points} نقطة</div></div>
+                      <div style={{flex:1}}>
+                        <div style={{fontWeight:600,fontSize:13}}>{c.name}</div>
+                        <div style={{fontSize:10,color:T.sub}}>🆔 {c.id} | 📱 {c.phone||"-"}</div>
+                      </div>
                       <div style={{fontWeight:700,color:T.green,fontSize:13}}>{(c.totalSpent||0).toFixed(0)} ر</div>
                     </div>
                   );
                 })}
               </div>
             )}
+
+            {/* تحليل AI */}
+            {customers.length>0&&(()=>{
+              const[aiReport,setAiReport]=React.useState("");
+              const[loadingReport,setLoadingReport]=React.useState(false);
+              const getAIReport=async()=>{
+                setLoadingReport(true);
+                try{
+                  const summary={
+                    totalCustomers:customers.length,
+                    totalRevenue:customers.reduce((s,c)=>s+(c.totalSpent||0),0).toFixed(0),
+                    totalPoints:customers.reduce((s,c)=>s+c.points,0),
+                    avgSpent:(customers.reduce((s,c)=>s+(c.totalSpent||0),0)/customers.length).toFixed(0),
+                    topCustomer:[...customers].sort((a,b)=>(b.totalSpent||0)-(a.totalSpent||0))[0]?.name,
+                    levels:LEVELS.map(l=>({level:l.name,count:customers.filter(c=>c.points>=l.min&&c.points<=l.max).length})),
+                    recentOrders:customers.flatMap(c=>(c.orders||[]).slice(0,2)).length
+                  };
+                  const res=await fetch("/.netlify/functions/chat",{method:"POST",headers:{"Content-Type":"application/json"},
+                    body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:800,
+                      messages:[{role:"user",content:`أنت مستشار تسويق ذكي. حلل هذه البيانات لأسواق خيرات السبتي وأعطني تقرير قصير بالعربي (٥ نقاط):
+${JSON.stringify(summary)}
+
+اكتب:
+1. ملخص الأداء
+2. نقاط القوة
+3. فرص التحسين
+4. توصيات للزيادة المبيعات
+5. عملاء يحتاجون اهتمام`}]})});
+                  const d=await res.json();
+                  setAiReport(d?.content?.[0]?.text||"");
+                }catch{setAiReport("حدث خطأ في التحليل");}
+                setLoadingReport(false);
+              };
+              return(
+                <div style={{background:T.card,border:`1px solid ${T.accent}33`,borderRadius:16,padding:16}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+                    <div style={{fontWeight:800,fontSize:12,color:T.accent}}>🤖 تحليل ذكي بالـ AI</div>
+                    <button onClick={getAIReport} disabled={loadingReport} style={{background:`linear-gradient(135deg,${T.accent},${T.sec})`,border:"none",borderRadius:10,padding:"6px 12px",cursor:"pointer",fontSize:11,fontWeight:700,color:"#000"}}>
+                      {loadingReport?"⏳ جاري التحليل...":"✨ حلل البيانات"}
+                    </button>
+                  </div>
+                  {aiReport?(
+                    <div style={{fontSize:12,color:T.text,lineHeight:1.8,whiteSpace:"pre-wrap"}}>{aiReport}</div>
+                  ):(
+                    <div style={{fontSize:11,color:T.sub,textAlign:"center",padding:10}}>اضغط "حلل البيانات" للحصول على تقرير ذكي عن عملائك 📊</div>
+                  )}
+                </div>
+              );
+            })()}
           </>
         )}
       </div>
@@ -5252,13 +5322,17 @@ export default function Root(){
     setCustomers(list);await dbSet(SK.customers,list);
   };
 
-  const handleLogin=(role,name)=>{
+  const handleLogin=(role,name,phone)=>{
     if(role==="admin"){setScreen("admin");return;}
-    // بحث عن عميل موجود بنفس الاسم
-    const existing=customers.find(c=>c.name===name);
-    if(existing){setCurrentCustomer(existing);setScreen("user");return;}
-    // عميل جديد
-    const customer={id:`c_${Date.now()}`,name,points:50,totalSpent:0,orders:[],joinDate:new Date().toLocaleDateString("ar-SA"),lastVisit:new Date().toLocaleDateString("ar-SA")};
+    // بحث عن عميل موجود بنفس الجوال
+    const existing=customers.find(c=>c.phone===phone);
+    if(existing){
+      const updated={...existing,lastVisit:new Date().toLocaleDateString("ar-SA"),name};
+      setCurrentCustomer(updated);saveCustomer(updated);setScreen("user");return;
+    }
+    // عميل جديد - ID يونيك
+    const uid=`KH-${phone.slice(-4)}-${Date.now().toString(36).toUpperCase().slice(-4)}`;
+    const customer={id:uid,name,phone,points:50,totalSpent:0,orders:[],preferences:[],joinDate:new Date().toLocaleDateString("ar-SA"),lastVisit:new Date().toLocaleDateString("ar-SA")};
     setCurrentCustomer(customer);
     saveCustomer(customer);
     setScreen("user");
