@@ -4382,7 +4382,7 @@ function CheckoutScreen({cart,customer,onDone,onBack}){
 // ═══════════════════ تطبيق المستخدم ═══════════════════
 function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
   const[tab,setTab]=useState("chat");
-  const[msgs,setMsgs]=useState([{role:"assistant",text:`أهلاً ${customer.name}! 🌟\nمعك سالم من أسواق خيرات السبتي 🛒\nرصيدك: **${customer.points} نقطة** ${getLevel(customer.points).icon}\n\nكيف أقدر أساعدك؟`,products:[]}]);
+  const[msgs,setMsgs]=useState([{role:"assistant",text:`أهلاً ${customer.name}! 🌟\nمعك عمر من أسواق خيرات السبتي 🛒\nرصيدك: **${customer.points} نقطة** ${getLevel(customer.points).icon}\n\nكيف أقدر أساعدك؟`,products:[]}]);
   const[input,setInput]=useState("");
   const[loading,setLoading]=useState(false);
   const[cart,setCart]=useState({});
@@ -4418,13 +4418,35 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
     window.speechSynthesis.speak(u);
   };
 
+  const SUPABASE_URL = "https://hceriantifhcbfzxyjbt.supabase.co";
+  const SUPABASE_KEY = "sb_publishable_Wrke7AsUSta286PrIvf87A_l38PCYx2";
+
+  const searchProducts = async (query) => {
+    try {
+      const res = await fetch(`${SUPABASE_URL}/rest/v1/products1?or=(name_ar.ilike.*${encodeURIComponent(query)}*,name_en.ilike.*${encodeURIComponent(query)}*,category_main_ar.ilike.*${encodeURIComponent(query)}*,category_sub_ar.ilike.*${encodeURIComponent(query)}*,brand.ilike.*${encodeURIComponent(query)}*)&limit=30`, {
+        headers: {
+          "apikey": SUPABASE_KEY,
+          "Authorization": `Bearer ${SUPABASE_KEY}`,
+        }
+      });
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch { return []; }
+  };
+
   const sendMsg=async(override,fromVoice=false)=>{
     const text=(override!==undefined?override:input).trim();
     if(!text||loading)return;
     setInput("");window.speechSynthesis?.cancel();
     const newMsgs=[...msgs,{role:"user",text}];
     setMsgs(newMsgs);setLoading(true);
-    const SYS=`أنت سالم، مساعد تسوق وخبير طبخ في أسواق خيرات السبتي. شخصيتك ودودة وطبيعية.
+    
+    const relatedProds = await searchProducts(text);
+    const prodsText = relatedProds.length > 0 
+      ? relatedProds.map(p=>`[${p.barcode}] ${p.name_ar} - ${p.brand||""} - ${p.price}ريال - ${p.category_sub_ar||p.category_main_ar}`).join("\n")
+      : "لا توجد منتجات مطابقة";
+
+    const SYS=`أنت عمر، مساعد تسوق وخبير طبخ في أسواق خيرات السبتي. شخصيتك ودودة وطبيعية.
 
 مهامك الأساسية:
 1. **خبير وصفات** — لما يطلب العميل وصفة، اعطه المكونات من قائمة منتجاتنا + طريقة الطبخ باختصار
@@ -4438,21 +4460,21 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
 
 العميل: ${customer.name} | نقاطه: ${customer.points} | مستواه: ${getLevel(customer.points).name}
 
-المنتجات المتاحة عندنا:
-${products.map(p=>`${p.name} - ${p.price}ر - ${p.cat}`).join("\n")}
+المنتجات المتاحة المتعلقة بطلب العميل:
+${prodsText}
 
 عند اقتراح منتجات اكتب في نهاية ردك: PRODUCTS:[{"id":"xx"}]`;
     try{
       const res=await fetch("/.netlify/functions/chat",{
         method:"POST",
-        headers:{"Content-Type":"application/json","anthropic-version":"2023-06-01","anthropic-dangerous-direct-browser-access":"true"},
-        body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,system:SYS.slice(0,40000),messages:newMsgs.map(m=>({"role":m.role,"content":m.text}))}),
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,system:SYS,messages:newMsgs.map(m=>({"role":m.role,"content":m.text}))}),
       });
       const d=await res.json();
       let reply=d?.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
       const match=reply.match(/PRODUCTS:\[[\s\S]*?\]/);
       let prods=[];
-      if(match){try{prods=JSON.parse(match[0].replace("PRODUCTS:","")).map(({id})=>products.find(p=>p.id===id)).filter(Boolean);}catch{}reply=reply.replace(/PRODUCTS:\[[\s\S]*?\]/,"").trim();}
+      if(match){try{prods=JSON.parse(match[0].replace("PRODUCTS:","")).map(({id})=>products.find(p=>p.barcode===id||p.id===id)).filter(Boolean);}catch{}reply=reply.replace(/PRODUCTS:\[[\s\S]*?\]/,"").trim();}
       setMsgs(p=>[...p,{role:"assistant",text:reply||"عذراً، حاول مرة ثانية!",products:prods}]);
       if(fromVoice)speak(reply);
     }catch{setMsgs(p=>[...p,{role:"assistant",text:"عذراً، حاول مرة ثانية!",products:[]}]);}
