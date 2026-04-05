@@ -4324,17 +4324,37 @@ function KhayrCards({customer,saveCustomer}){
 function CheckoutScreen({cart,customer,onDone,onBack}){
   const items=Object.values(cart);
   const sub=items.reduce((s,p)=>s+(p.offer?p.offerPrice:p.price),0);
-  const pts=calcPts(sub);
+  const FREE_DELIVERY=50;
+  const DELIVERY_FEE=10;
+  const delivery=sub>=FREE_DELIVERY?0:DELIVERY_FEE;
+  const remaining=sub<FREE_DELIVERY?(FREE_DELIVERY-sub).toFixed(2):0;
   const[use,setUse]=useState(false);
+  const[payMethod,setPayMethod]=useState("cash");
   const maxD=Math.min(Math.floor(customer.points/10),Math.floor(sub*0.5));
   const disc=use?maxD:0;
-  const total=sub-disc;
+  const total=sub-disc+delivery;
 
   return(
-    <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Segoe UI',Tahoma,sans-serif",direction:"rtl",color:T.text,padding:"20px 16px"}}>
+    <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Segoe UI',Tahoma,sans-serif",direction:"rtl",color:T.text,padding:"20px 16px",paddingBottom:40}}>
       <button onClick={onBack} style={{background:"rgba(255,255,255,0.07)",border:`1px solid ${T.border}`,borderRadius:12,padding:"8px 16px",cursor:"pointer",color:T.text,fontSize:13,marginBottom:18}}>← رجوع</button>
       <h2 style={{fontSize:18,fontWeight:900,marginBottom:18}}>🧾 ملخص الطلب</h2>
 
+      {/* تنبيه التوصيل */}
+      {sub<FREE_DELIVERY?(
+        <div style={{background:"linear-gradient(135deg,#f59e0b22,#ef444422)",border:"1.5px solid #f59e0b55",borderRadius:16,padding:14,marginBottom:14,textAlign:"center"}}>
+          <div style={{fontSize:14,fontWeight:700,color:"#f59e0b",marginBottom:4}}>🚚 أضف {remaining} ريال وأحصل على توصيل مجاني! 🎁</div>
+          <div style={{fontSize:12,color:T.sub}}>التوصيل المجاني عند الشراء بـ 50 ريال فأكثر</div>
+          <div style={{marginTop:8,background:"rgba(255,255,255,0.05)",borderRadius:10,height:8,overflow:"hidden"}}>
+            <div style={{height:"100%",width:`${Math.min((sub/FREE_DELIVERY)*100,100)}%`,background:"linear-gradient(90deg,#f59e0b,#ef4444)",borderRadius:10,transition:"width 0.5s"}}/>
+          </div>
+        </div>
+      ):(
+        <div style={{background:"linear-gradient(135deg,#10b98122,#06b6d422)",border:"1.5px solid #10b98155",borderRadius:16,padding:14,marginBottom:14,textAlign:"center"}}>
+          <div style={{fontSize:15,fontWeight:800,color:"#10b981"}}>🎉 مبروك! التوصيل مجاني على طلبك!</div>
+        </div>
+      )}
+
+      {/* المنتجات */}
       <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:14,marginBottom:14}}>
         {items.map(p=>(
           <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
@@ -4347,6 +4367,19 @@ function CheckoutScreen({cart,customer,onDone,onBack}){
         ))}
       </div>
 
+      {/* طريقة الدفع */}
+      <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:14,marginBottom:14}}>
+        <div style={{fontWeight:700,fontSize:14,marginBottom:12}}>💳 طريقة الدفع</div>
+        <div style={{display:"flex",gap:10}}>
+          {[{id:"cash",label:"💵 كاش",icon:"💵"},{id:"card",label:"💳 بطاقة",icon:"💳"},{id:"apple",label:" Apple Pay",icon:"🍎"},{id:"stc",label:"STC Pay",icon:"📱"}].map(m=>(
+            <div key={m.id} onClick={()=>setPayMethod(m.id)} style={{flex:1,padding:"10px 4px",borderRadius:12,border:`2px solid ${payMethod===m.id?T.primary:T.border}`,background:payMethod===m.id?`${T.primary}22`:"transparent",cursor:"pointer",textAlign:"center",fontSize:12,fontWeight:payMethod===m.id?700:400,color:payMethod===m.id?T.primary:T.text,transition:"all 0.2s"}}>
+              {m.label}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* النقاط */}
       {customer.points>=10&&(
         <div style={{background:`linear-gradient(135deg,${T.primary}15,${T.pink}10)`,border:`1px solid ${T.primary}33`,borderRadius:16,padding:14,marginBottom:14}}>
           <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
@@ -4359,21 +4392,27 @@ function CheckoutScreen({cart,customer,onDone,onBack}){
         </div>
       )}
 
+      {/* الملخص */}
       <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:16,marginBottom:16}}>
         <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:13,color:T.sub}}><span>المجموع:</span><span>{sub.toFixed(2)} ر</span></div>
         {disc>0&&<div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:13,color:"#fbbf24"}}><span>خصم النقاط:</span><span>- {disc} ر</span></div>}
+        <div style={{display:"flex",justifyContent:"space-between",marginBottom:6,fontSize:13,color:delivery===0?"#10b981":T.sub}}>
+          <span>🚚 التوصيل:</span>
+          <span style={{fontWeight:700}}>{delivery===0?"مجاني 🎁":`${delivery} ر`}</span>
+        </div>
         <div style={{height:1,background:T.border,margin:"10px 0"}}/>
         <div style={{display:"flex",justifyContent:"space-between",fontSize:18,fontWeight:900}}><span>الإجمالي:</span><span style={{color:T.green}}>{total.toFixed(2)} ريال</span></div>
       </div>
 
+      {/* النقاط المكتسبة */}
       <div style={{background:`linear-gradient(135deg,${T.green}15,${T.accent}10)`,border:`1px solid ${T.green}33`,borderRadius:16,padding:14,marginBottom:20,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
         <div><div style={{fontWeight:700,fontSize:14}}>⭐ ستكسب من هذه الفاتورة</div><div style={{fontSize:12,color:T.sub,marginTop:2}}>كل ريال = نقطة واحدة</div></div>
         <div style={{fontWeight:900,fontSize:26,color:T.green}}>+{calcPts(total)}</div>
       </div>
 
-      <button onClick={()=>onDone(total,use?maxD:0,calcPts(total))}
+      <button onClick={()=>onDone(total,use?maxD:0,calcPts(total),payMethod,delivery)}
         style={{width:"100%",padding:"15px 0",background:`linear-gradient(135deg,${T.primary},${T.pink})`,border:"none",borderRadius:14,cursor:"pointer",fontWeight:900,fontSize:16,color:"#000",boxShadow:`0 4px 25px ${T.primary}44`}}>
-        💳 تأكيد الدفع
+        {payMethod==="cash"?"💵 تأكيد الدفع كاش":payMethod==="card"?"💳 ادفع بالبطاقة":payMethod==="apple"?"🍎 ادفع بـ Apple Pay":"📱 ادفع بـ STC Pay"}
       </button>
     </div>
   );
@@ -4470,7 +4509,9 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
 المنتجات المتاحة المتعلقة بطلب العميل:
 ${prodsText}
 
-⚠️ مهم: عند اقتراح منتجات اكتب في نهاية ردك: PRODUCTS:[{"id":"BARCODE_هنا"}]`;
+⚠️ مهم جداً:
+- عند اقتراح منتجات اكتب في نهاية ردك: PRODUCTS:[{"id":"BARCODE_هنا"}]
+- إذا مجموع سلة العميل أقل من 50 ريال، رغّبه بإضافة منتجات إضافية للوصول لـ 50 ريال والحصول على توصيل مجاني! استخدم أسلوب تشويقي مثل "بس ${50 - (Object.values(cart||{}).reduce((s,p)=>s+(p.offer?p.offerPrice:p.price),0))?.toFixed(2) || 'قليل'} ريال وتوصيلك مجاني! 🚚🎁"`;
 
     try{
       const res=await fetch("/.netlify/functions/chat",{
@@ -4528,9 +4569,9 @@ ${prodsText}
     });
   },[]);
 
-  const handleCheckoutDone=(total,disc,earnedPts)=>{
+  const handleCheckoutDone=(total,disc,earnedPts,payMethod="cash",delivery=0)=>{
     const usedPts=disc*10;
-    const order={id:`ord_${Date.now()}`,date:new Date().toLocaleDateString("ar-SA"),total,disc,earnedPts,itemCount:Object.keys(cart).length};
+    const order={id:`ord_${Date.now()}`,date:new Date().toLocaleDateString("ar-SA"),total,disc,earnedPts,itemCount:Object.keys(cart).length,payMethod:payMethod||"cash",delivery:delivery||0};
     const updated={...customer,points:customer.points-usedPts+earnedPts,totalSpent:(customer.totalSpent||0)+total,lastVisit:new Date().toLocaleDateString("ar-SA"),orders:[order,...(customer.orders||[]).slice(0,19)]};
     setCustomer(updated);saveCustomer(updated);
     setLastOrder({...order,newPts:updated.points,lvl:getLevel(updated.points)});
@@ -4579,8 +4620,10 @@ ${prodsText}
       </div>
       <div>${invoiceItems.map(p=>`<div class="item"><div class="item-name">${p.name}<br><small style="color:#888">${p.unit||""}</small></div><div class="item-price">${p.offer?p.offerPrice:p.price} ر</div></div>`).join("")}</div>
       <div class="summary">
-        <div class="row"><span>المجموع قبل الخصم:</span><span>${(lastOrder.total+(lastOrder.disc||0)).toFixed(2)} ر</span></div>
+        <div class="row"><span>المجموع قبل الخصم:</span><span>${(lastOrder.total+(lastOrder.disc||0)-(lastOrder.delivery||0)).toFixed(2)} ر</span></div>
         ${lastOrder.disc>0?`<div class="row" style="color:#d97706"><span>خصم النقاط:</span><span>- ${lastOrder.disc} ر</span></div>`:""}
+        <div class="row" style="color:${lastOrder.delivery===0?'#059669':'#666'}"><span>التوصيل:</span><span>${lastOrder.delivery===0?"مجاني 🎁":`${lastOrder.delivery} ر`}</span></div>
+        <div class="row"><span>طريقة الدفع:</span><span>${lastOrder.payMethod==="cash"?"💵 كاش":lastOrder.payMethod==="card"?"💳 بطاقة":lastOrder.payMethod==="apple"?"🍎 Apple Pay":"📱 STC Pay"}</span></div>
         <div class="total-row"><span>الإجمالي:</span><span>${lastOrder.total.toFixed(2)} ريال</span></div>
       </div>
       <div class="points">⭐ كسبت ${lastOrder.earnedPts} نقطة | رصيدك: ${customer.points} نقطة</div>
@@ -4690,6 +4733,18 @@ ${prodsText}
                 <span style={{color:T.sub}}>الإجمالي:</span>
                 <span style={{fontWeight:900,fontSize:17,color:T.green}}>{cartTotal.toFixed(2)} ريال</span>
               </div>
+              {(()=>{
+                const cartSub=cartItems.reduce((s,p)=>s+(p.offer?p.offerPrice:p.price),0);
+                const remaining=(50-cartSub).toFixed(2);
+                return cartSub<50?(
+                  <div style={{background:"linear-gradient(135deg,#f59e0b22,#ef444411)",border:"1.5px solid #f59e0b44",borderRadius:12,padding:10,marginBottom:10,textAlign:"center"}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#f59e0b"}}>🚚 أضف {remaining} ريال فقط للتوصيل المجاني!</div>
+                    <div style={{fontSize:11,color:T.sub,marginTop:2}}>الآن رسوم التوصيل 10 ريال</div>
+                  </div>
+                ):(<div style={{background:"linear-gradient(135deg,#10b98122,#06b6d411)",border:"1.5px solid #10b98144",borderRadius:12,padding:10,marginBottom:10,textAlign:"center"}}>
+                    <div style={{fontSize:13,fontWeight:700,color:"#10b981"}}>🎉 التوصيل مجاني على طلبك!</div>
+                  </div>);
+              })()}
               <button onClick={()=>{setCartOpen(false);setScreen("checkout");}} style={{width:"100%",padding:"12px 0",background:`linear-gradient(135deg,${T.primary},${T.pink})`,border:"none",color:"#000",borderRadius:12,cursor:"pointer",fontWeight:900,fontSize:14}}>💳 الدفع</button>
             </div>}
           </div>
