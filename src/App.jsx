@@ -4423,14 +4423,19 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
 
   const searchProducts = async (query) => {
     try {
-      const res = await fetch(`${SUPABASE_URL}/rest/v1/products1?or=(name_ar.ilike.*${encodeURIComponent(query)}*,name_en.ilike.*${encodeURIComponent(query)}*,category_main_ar.ilike.*${encodeURIComponent(query)}*,category_sub_ar.ilike.*${encodeURIComponent(query)}*,brand.ilike.*${encodeURIComponent(query)}*)&limit=30`, {
-        headers: {
-          "apikey": SUPABASE_KEY,
-          "Authorization": `Bearer ${SUPABASE_KEY}`,
-        }
-      });
-      const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      const keywords = query.trim().split(/\s+/).filter(w => w.length > 1);
+      const allResults = [];
+      for (const word of keywords.slice(0, 5)) {
+        const enc = encodeURIComponent(word);
+        const res = await fetch(
+          `${SUPABASE_URL}/rest/v1/products1?or=(name_ar.ilike.*${enc}*,name_en.ilike.*${enc}*,category_main_ar.ilike.*${enc}*,category_sub_ar.ilike.*${enc}*,brand.ilike.*${enc}*)&limit=20`,
+          { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } }
+        );
+        const data = await res.json();
+        if (Array.isArray(data)) allResults.push(...data);
+      }
+      const unique = Object.values(Object.fromEntries(allResults.map(p => [p.barcode, p])));
+      return unique.slice(0, 40);
     } catch { return []; }
   };
 
@@ -4440,41 +4445,51 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
     setInput("");window.speechSynthesis?.cancel();
     const newMsgs=[...msgs,{role:"user",text}];
     setMsgs(newMsgs);setLoading(true);
-    
+
     const relatedProds = await searchProducts(text);
-    const prodsText = relatedProds.length > 0 
+    const prodsText = relatedProds.length > 0
       ? relatedProds.map(p=>`[${p.barcode}] ${p.name_ar} - ${p.brand||""} - ${p.price}ريال - ${p.category_sub_ar||p.category_main_ar}`).join("\n")
-      : "لا توجد منتجات مطابقة";
+      : "لا توجد منتجات مطابقة في قاعدة البيانات";
 
-    const SYS=`أنت عمر، مساعد تسوق وخبير طبخ في أسواق خيرات السبتي. شخصيتك ودودة وطبيعية.
+    const SYS=`أنت عمر، مساعد تسوق ذكي وخبير طبخ في أسواق خيرات السبتي. شخصيتك ودودة، حيوية، وتسويقية.
 
-مهامك الأساسية:
-1. **خبير وصفات** — لما يطلب العميل وصفة، اعطه المكونات من قائمة منتجاتنا + طريقة الطبخ باختصار
-2. **مساعد تسوق** — اقترح المنتجات المناسبة من عندنا واذكر سعرها
-3. **ترغيب بالشراء** — اربط الوصفات بالمنتجات المتاحة عندنا
+🎯 مهامك:
+1. **وصفات شهية** — لما يطلب العميل وصفة، اعطه طريقة تحضير ممتعة ومفصّلة
+2. **مساعد تسوق ذكي** — اربط كل مكون بمنتج من قائمتنا مع السعر
+3. **ترغيب وتشويق** — استخدم أسلوب تسويقي ممتع يشجع على الشراء
 
-عند اقتراح وصفة:
-- اذكر المكونات المتوفرة عندنا أولاً مع الأسعار
-- اذكر طريقة الطبخ باختصار (3-4 خطوات)
-- شجّع العميل يضيف المكونات للسلة
+📝 عند طلب وصفة، رد بهذا الترتيب:
+أولاً: مقدمة شهية ومشوّقة عن الوصفة 🍽️
+ثانياً: المكونات مع المنتجات المتاحة وأسعارها
+ثالثاً: خطوات التحضير بأسلوب ممتع
+رابعاً: نصيحة أو سر الطبخ
+خامساً: دعوة للشراء بأسلوب لطيف
 
 العميل: ${customer.name} | نقاطه: ${customer.points} | مستواه: ${getLevel(customer.points).name}
 
 المنتجات المتاحة المتعلقة بطلب العميل:
 ${prodsText}
 
-عند اقتراح منتجات اكتب في نهاية ردك: PRODUCTS:[{"id":"xx"}]`;
+⚠️ مهم: عند اقتراح منتجات اكتب في نهاية ردك: PRODUCTS:[{"id":"BARCODE_هنا"}]`;
+
     try{
       const res=await fetch("/.netlify/functions/chat",{
         method:"POST",
         headers:{"Content-Type":"application/json"},
-        body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:600,system:SYS,messages:newMsgs.map(m=>({"role":m.role,"content":m.text}))}),
+        body:JSON.stringify({model:"claude-haiku-4-5-20251001",max_tokens:1000,system:SYS,messages:newMsgs.map(m=>({"role":m.role,"content":m.text}))}),
       });
       const d=await res.json();
       let reply=d?.content?.filter(b=>b.type==="text").map(b=>b.text).join("")||"";
       const match=reply.match(/PRODUCTS:\[[\s\S]*?\]/);
       let prods=[];
-      if(match){try{prods=JSON.parse(match[0].replace("PRODUCTS:","")).map(({id})=>products.find(p=>p.barcode===id||p.id===id)).filter(Boolean);}catch{}reply=reply.replace(/PRODUCTS:\[[\s\S]*?\]/,"").trim();}
+      if(match){
+        try{
+          const ids=JSON.parse(match[0].replace("PRODUCTS:","")).map(x=>x.id||x.barcode).filter(Boolean);
+          prods=relatedProds.filter(p=>ids.includes(p.barcode));
+          if(!prods.length) prods=relatedProds.slice(0,6);
+        }catch{}
+        reply=reply.replace(/PRODUCTS:\[[\s\S]*?\]/,"").trim();
+      }
       setMsgs(p=>[...p,{role:"assistant",text:reply||"عذراً، حاول مرة ثانية!",products:prods}]);
       if(fromVoice)speak(reply);
     }catch{setMsgs(p=>[...p,{role:"assistant",text:"عذراً، حاول مرة ثانية!",products:[]}]);}
