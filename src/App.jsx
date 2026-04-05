@@ -4469,14 +4469,53 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
   const SUPABASE_URL = "https://hceriantifhcbfzxyjbt.supabase.co";
   const SUPABASE_KEY = "sb_publishable_Wrke7AsUSta286PrIvf87A_l38PCYx2";
 
+  // قاموس المترادفات
+  const SYNONYMS = {
+    "دجاج": ["دجاج","chicken","دجاجة","فراخ","broiler"],
+    "لحم": ["لحم","beef","meat","غنم","بقر","عجل"],
+    "أرز": ["أرز","rice","رز"],
+    "خبز": ["خبز","bread","توست","صمون"],
+    "بيض": ["بيض","eggs","egg","بيضة"],
+    "حليب": ["حليب","milk","لبن"],
+    "جبن": ["جبن","cheese","جبنة"],
+    "طماطم": ["طماطم","tomato","بندورة"],
+    "بصل": ["بصل","onion"],
+    "ثوم": ["ثوم","garlic"],
+    "زيت": ["زيت","oil","سمن"],
+    "سكر": ["سكر","sugar"],
+    "دقيق": ["دقيق","flour","طحين"],
+    "ماء": ["ماء","water","مياه"],
+    "عصير": ["عصير","juice"],
+    "شاي": ["شاي","tea"],
+    "قهوة": ["قهوة","coffee","نسكافيه"],
+    "سمك": ["سمك","fish","seafood"],
+    "روبيان": ["روبيان","shrimp","جمبري"],
+    "كبسة": ["أرز","دجاج","لحم","بهارات","هيل","قرفة"],
+    "مكرونة": ["مكرونة","pasta","معكرونة","إسباغيتي"],
+    "بيتزا": ["جبن","طماطم","دقيق","خميرة"],
+    "سلطة": ["خس","طماطم","خيار","جزر"],
+    "شوربة": ["دجاج","خضار","جزر","بطاطا"],
+  };
+
   const searchProducts = async (query) => {
     try {
-      const keywords = query.trim().split(/\s+/).filter(w => w.length > 1);
+      // استخراج الكلمات + المترادفات
+      const words = query.trim().split(/\s+/).filter(w => w.length > 1);
+      const allKeywords = new Set();
+      for(const w of words){
+        allKeywords.add(w);
+        // البحث عن مترادفات
+        for(const [key, syns] of Object.entries(SYNONYMS)){
+          if(w.includes(key)||key.includes(w)){
+            syns.forEach(s=>allKeywords.add(s));
+          }
+        }
+      }
       const allResults = [];
-      for (const word of keywords.slice(0, 5)) {
+      for (const word of [...allKeywords].slice(0, 8)) {
         const enc = encodeURIComponent(word);
         const res = await fetch(
-          `${SUPABASE_URL}/rest/v1/products1?or=(name_ar.ilike.*${enc}*,name_en.ilike.*${enc}*,category_main_ar.ilike.*${enc}*,category_sub_ar.ilike.*${enc}*,brand.ilike.*${enc}*)&limit=20`,
+          `${SUPABASE_URL}/rest/v1/products1?or=(name_ar.ilike.*${enc}*,name_en.ilike.*${enc}*,category_main_ar.ilike.*${enc}*,category_sub_ar.ilike.*${enc}*,brand.ilike.*${enc}*)&limit=15`,
           { headers: { "apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}` } }
         );
         const data = await res.json();
