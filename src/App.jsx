@@ -4503,6 +4503,16 @@ ${prodsText}
           }));
         }catch{}
         reply=reply.replace(/PRODUCTS:\[[\s\S]*?\]/,"").trim();
+        // Auto-add products to cart
+        if(prods.length>0){
+          setCart(prev=>{
+            const next={...prev};
+            prods.forEach(p=>{if(!next[p.id])next[p.id]=p;});
+            return next;
+          });
+          setBounce(true);setTimeout(()=>setBounce(false),500);
+          setCartOpen(true);
+        }
       }
       setMsgs(p=>[...p,{role:"assistant",text:reply||"عذراً، حاول مرة ثانية!",products:prods}]);
       if(fromVoice)speak(reply);
@@ -4524,7 +4534,7 @@ ${prodsText}
     const updated={...customer,points:customer.points-usedPts+earnedPts,totalSpent:(customer.totalSpent||0)+total,lastVisit:new Date().toLocaleDateString("ar-SA"),orders:[order,...(customer.orders||[]).slice(0,19)]};
     setCustomer(updated);saveCustomer(updated);
     setLastOrder({...order,newPts:updated.points,lvl:getLevel(updated.points)});
-    setCart({});setScreen("success");
+    setLastOrder(prev=>({...prev,items:Object.values(cart)}));setCart({});setScreen("success");
   };
 
   const cartItems=Object.values(cart);
@@ -4540,23 +4550,81 @@ ${prodsText}
 
   if(screen==="checkout")return<CheckoutScreen cart={cart} customer={customer} onDone={handleCheckoutDone} onBack={()=>setScreen("app")}/>;
 
-  if(screen==="success"&&lastOrder)return(
-    <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Segoe UI',Tahoma,sans-serif",direction:"rtl",color:T.text,display:"flex",flexDirection:"column",alignItems:"center",justifyContent:"center",padding:20}}>
-      <div style={{fontSize:80,marginBottom:16,animation:"pop 0.5s"}}>🎉</div>
-      <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>شكراً على شرائك!</h2>
-      <p style={{color:T.sub,fontSize:14,marginBottom:24}}>تم تأكيد طلبك بنجاح</p>
-      <div style={{width:"100%",maxWidth:360}}>
-        <div style={{background:`linear-gradient(135deg,${T.green}22,${T.accent}11)`,border:`2px solid ${T.green}44`,borderRadius:22,padding:22,marginBottom:14,textAlign:"center"}}>
-          <div style={{fontSize:13,color:T.sub,marginBottom:4}}>كسبت</div>
-          <div style={{fontWeight:900,fontSize:44,color:T.green}}>+{lastOrder.earnedPts} ⭐</div>
-          <div style={{fontSize:13,color:T.sub,marginTop:4}}>رصيدك الجديد: <strong style={{color:lvl.color}}>{customer.points} نقطة</strong></div>
+  if(screen==="success"&&lastOrder){
+    const invoiceItems=lastOrder.items||[];
+    const printInvoice=()=>{
+      const w=window.open("","_blank");
+      w.document.write(`<!DOCTYPE html><html dir="rtl"><head><meta charset="UTF-8"><title>فاتورة - أسواق خيرات السبتي</title>
+      <style>
+        body{font-family:Arial,sans-serif;direction:rtl;padding:20px;max-width:400px;margin:auto;color:#111}
+        .header{text-align:center;border-bottom:2px solid #333;padding-bottom:12px;margin-bottom:16px}
+        .logo{font-size:22px;font-weight:900;color:#f59e0b}
+        .subtitle{font-size:11px;color:#666;margin-top:4px}
+        .inv-num{font-size:12px;color:#888;margin-top:6px}
+        .item{display:flex;justify-content:space-between;padding:7px 0;border-bottom:1px solid #eee;font-size:13px}
+        .item-name{flex:1}
+        .item-price{font-weight:700;color:#059669}
+        .summary{margin-top:12px;padding:12px;background:#f9f9f9;border-radius:8px}
+        .row{display:flex;justify-content:space-between;font-size:13px;margin-bottom:5px}
+        .total-row{display:flex;justify-content:space-between;font-size:16px;font-weight:900;border-top:2px solid #333;padding-top:8px;margin-top:8px}
+        .points{text-align:center;margin-top:14px;padding:10px;background:#fef3c7;border-radius:8px;font-size:13px}
+        .footer{text-align:center;margin-top:16px;font-size:11px;color:#888}
+        @media print{button{display:none}}
+      </style></head><body>
+      <div class="header">
+        <div class="logo">🌿 أسواق خيرات السبتي</div>
+        <div class="subtitle">فاتورة ضريبية مبسطة</div>
+        <div class="inv-num">رقم الفاتورة: ${lastOrder.id} | التاريخ: ${lastOrder.date}</div>
+        <div class="inv-num">العميل: ${customer.name} | رقم العضوية: ${customer.id||"-"}</div>
+      </div>
+      <div>${invoiceItems.map(p=>`<div class="item"><div class="item-name">${p.name}<br><small style="color:#888">${p.unit||""}</small></div><div class="item-price">${p.offer?p.offerPrice:p.price} ر</div></div>`).join("")}</div>
+      <div class="summary">
+        <div class="row"><span>المجموع قبل الخصم:</span><span>${(lastOrder.total+(lastOrder.disc||0)).toFixed(2)} ر</span></div>
+        ${lastOrder.disc>0?`<div class="row" style="color:#d97706"><span>خصم النقاط:</span><span>- ${lastOrder.disc} ر</span></div>`:""}
+        <div class="total-row"><span>الإجمالي:</span><span>${lastOrder.total.toFixed(2)} ريال</span></div>
+      </div>
+      <div class="points">⭐ كسبت ${lastOrder.earnedPts} نقطة | رصيدك: ${customer.points} نقطة</div>
+      <div class="footer">شكراً لتسوقك معنا! 💚<br>أسواق خيرات السبتي</div>
+      <br><button onclick="window.print()" style="width:100%;padding:10px;background:#f59e0b;border:none;border-radius:8px;font-size:15px;cursor:pointer;font-weight:700">🖨️ طباعة الفاتورة</button>
+      </body></html>`);
+      w.document.close();
+    };
+    return(
+      <div style={{minHeight:"100vh",background:T.bg,fontFamily:"'Segoe UI',Tahoma,sans-serif",direction:"rtl",color:T.text,padding:"20px 16px"}}>
+        <div style={{textAlign:"center",marginBottom:20}}>
+          <div style={{fontSize:70,animation:"pop 0.5s"}}>🎉</div>
+          <h2 style={{fontSize:22,fontWeight:900,marginBottom:4}}>تم تأكيد طلبك!</h2>
+          <p style={{color:T.sub,fontSize:13}}>رقم الفاتورة: {lastOrder.id}</p>
+        </div>
+        <div style={{background:T.card,border:`1px solid ${T.border}`,borderRadius:18,padding:16,marginBottom:14}}>
+          <div style={{fontWeight:800,fontSize:15,marginBottom:12}}>🧾 تفاصيل الفاتورة</div>
+          {invoiceItems.map(p=>(
+            <div key={p.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:`1px solid ${T.border}`}}>
+              <div style={{display:"flex",gap:8,alignItems:"center"}}>
+                <div style={{width:32,height:32,borderRadius:8,overflow:"hidden",background:`${p.color||T.primary}15`}}><PImg p={p} size={28}/></div>
+                <div><div style={{fontWeight:600,fontSize:13}}>{p.name}</div><div style={{fontSize:11,color:T.sub}}>{p.unit}</div></div>
+              </div>
+              <div style={{fontWeight:700,color:T.green}}>{p.offer?p.offerPrice:p.price} ر</div>
+            </div>
+          ))}
+          <div style={{marginTop:12,paddingTop:10,borderTop:`1px solid ${T.border}`}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:T.sub,marginBottom:4}}><span>المجموع:</span><span>{(lastOrder.total+(lastOrder.disc||0)).toFixed(2)} ر</span></div>
+            {lastOrder.disc>0&&<div style={{display:"flex",justifyContent:"space-between",fontSize:13,color:"#fbbf24",marginBottom:4}}><span>خصم النقاط:</span><span>- {lastOrder.disc} ر</span></div>}
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:17,fontWeight:900}}><span>الإجمالي:</span><span style={{color:T.green}}>{lastOrder.total.toFixed(2)} ريال</span></div>
+          </div>
+        </div>
+        <div style={{background:`linear-gradient(135deg,${T.green}22,${T.accent}11)`,border:`2px solid ${T.green}44`,borderRadius:18,padding:16,marginBottom:14,textAlign:"center"}}>
+          <div style={{fontSize:13,color:T.sub}}>كسبت من هذا الطلب</div>
+          <div style={{fontWeight:900,fontSize:40,color:T.green}}>+{lastOrder.earnedPts} ⭐</div>
+          <div style={{fontSize:13,color:T.sub}}>رصيدك الجديد: <strong style={{color:lvl.color}}>{customer.points} نقطة</strong></div>
         </div>
         <LoyaltyCard customer={customer}/>
-        <button onClick={()=>setScreen("app")} style={{width:"100%",padding:"14px 0",background:`linear-gradient(135deg,${T.primary},${T.pink})`,border:"none",borderRadius:14,cursor:"pointer",fontWeight:800,fontSize:15,color:"#000"}}>متابعة التسوق 🛒</button>
+        <button onClick={printInvoice} style={{width:"100%",padding:"13px 0",background:`linear-gradient(135deg,${T.accent},${T.green})`,border:"none",borderRadius:14,cursor:"pointer",fontWeight:800,fontSize:15,color:"#000",marginTop:12,marginBottom:10}}>🖨️ طباعة / تحميل الفاتورة</button>
+        <button onClick={()=>setScreen("app")} style={{width:"100%",padding:"13px 0",background:`linear-gradient(135deg,${T.primary},${T.pink})`,border:"none",borderRadius:14,cursor:"pointer",fontWeight:800,fontSize:15,color:"#000"}}>متابعة التسوق 🛒</button>
+        <style>{`@keyframes pop{0%{transform:scale(0)}80%{transform:scale(1.2)}100%{transform:scale(1)}}`}</style>
       </div>
-      <style>{`@keyframes pop{0%{transform:scale(0)}80%{transform:scale(1.2)}100%{transform:scale(1)}}`}</style>
-    </div>
-  );
+    );
+  }
 
   const TABS=[{k:"chat",l:"💬 سالم"},{k:"browse",l:"🏪 المنتجات"},{k:"offers",l:`🏷️${offerProds.length>0?` (${offerProds.length})`:""}`},{k:"loyalty",l:"⭐ نقاطي"},{k:"khayr",l:"🤍 خير"}];
 
