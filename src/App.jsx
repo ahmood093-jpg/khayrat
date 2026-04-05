@@ -4487,6 +4487,20 @@ ${prodsText}
           const ids=JSON.parse(match[0].replace("PRODUCTS:","")).map(x=>x.id||x.barcode).filter(Boolean);
           prods=relatedProds.filter(p=>ids.includes(p.barcode));
           if(!prods.length) prods=relatedProds.slice(0,6);
+          // map Supabase fields to app fields
+          prods=prods.map(p=>({
+            id:p.barcode,
+            barcode:p.barcode,
+            name:p.name_ar,
+            brand:p.brand||"",
+            price:parseFloat(p.price)||0,
+            unit:p.unit||"",
+            cat:p.category_sub_ar||p.category_main_ar||"",
+            img:p.img||"",
+            color:"#8b5cf6",
+            offer:false,
+            offerPrice:null
+          }));
         }catch{}
         reply=reply.replace(/PRODUCTS:\[[\s\S]*?\]/,"").trim();
       }
