@@ -4566,12 +4566,68 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
     } catch { return []; }
   };
 
+  // ═══ ذاكرة العميل ═══
+  const saveMemory = async (newData) => {
+    try {
+      const key = `memory_${customer.id}`;
+      const existing = JSON.parse(localStorage.getItem(key)||"{}");
+      const updated = {...existing, ...newData, lastUpdate: new Date().toISOString()};
+      localStorage.setItem(key, JSON.stringify(updated));
+      // حفظ في Supabase أيضاً
+      await fetch(`${SUPABASE_URL}/rest/v1/customer_memory`, {
+        method: "POST",
+        headers: {"apikey": SUPABASE_KEY, "Authorization": `Bearer ${SUPABASE_KEY}`, "Content-Type": "application/json", "Prefer": "resolution=merge-duplicates"},
+        body: JSON.stringify({customer_id: customer.id, memory: JSON.stringify(updated)})
+      });
+    } catch(e) { console.log("Memory save error:", e); }
+  };
+
+  const getMemory = () => {
+    try {
+      const key = `memory_${customer.id}`;
+      return JSON.parse(localStorage.getItem(key)||"{}");
+    } catch { return {}; }
+  };
+
+  const updateMemoryFromConversation = async (userMsg, aiReply) => {
+    const memory = getMemory();
+    const likes = memory.likes || [];
+    const dislikes = memory.dislikes || [];
+    const topics = memory.topics || [];
+    
+    // استخراج تفضيلات من الرسائل
+    if(userMsg.includes("ما أبي") || userMsg.includes("ما أحب") || userMsg.includes("بدون")) {
+      dislikes.push(userMsg.slice(0,50));
+    }
+    if(userMsg.includes("أبي") || userMsg.includes("أحب") || userMsg.includes("ممتاز")) {
+      likes.push(userMsg.slice(0,50));
+    }
+    topics.push(userMsg.slice(0,30));
+    
+    await saveMemory({
+      likes: [...new Set(likes)].slice(-10),
+      dislikes: [...new Set(dislikes)].slice(-5),
+      topics: [...new Set(topics)].slice(-20),
+      lastMsg: userMsg.slice(0,100),
+      totalMsgs: (memory.totalMsgs||0) + 1
+    });
+  };
+
   const sendMsg=async(override,fromVoice=false)=>{
     const text=(override!==undefined?override:input).trim();
     if(!text||loading)return;
     setInput("");window.speechSynthesis?.cancel();
     const newMsgs=[...msgs,{role:"user",text}];
     setMsgs(newMsgs);setLoading(true);
+
+    // تحميل ذاكرة العميل
+    const memory = getMemory();
+    const memoryContext = memory.totalMsgs > 0 ? `
+تفضيلات العميل من زيارات سابقة:
+- يحب: ${(memory.likes||[]).slice(-3).join("، ")||"غير محدد"}
+- لا يريد: ${(memory.dislikes||[]).slice(-3).join("، ")||"غير محدد"}
+- اهتماماته: ${(memory.topics||[]).slice(-5).join("، ")||"غير محدد"}
+- عدد زياراته: ${memory.totalMsgs||0} رسالة سابقة` : "";
 
     const relatedProds = await searchProducts(text);
     const prodsText = relatedProds.length > 0
@@ -4609,6 +4665,8 @@ function UserApp({products,customer,setCustomer,saveCustomer,onLogout}){
 ${deliveryMsg}
 
 العميل: ${customer.name} | رقم العضوية: ${customer.id} | نقاطه: ${customer.points} | مستواه: ${getLevel(customer.points).name} | انضم: ${customer.joinDate||"جديد"}
+${memoryContext}
+آخر طلبات العميل: ${(customer.orders||[]).slice(0,3).map(o=>`${o.date}: ${o.total}ر`).join(" | ")||"لا يوجد"}
 
 المنتجات المتاحة المتعلقة بطلب العميل:
 ${prodsText}
@@ -4661,6 +4719,8 @@ ${prodsText}
       }
       setMsgs(p=>[...p,{role:"assistant",text:reply||"عذراً، حاول مرة ثانية!",products:prods}]);
       if(fromVoice)speak(reply);
+      // حفظ الذاكرة
+      updateMemoryFromConversation(text, reply);
     }catch{setMsgs(p=>[...p,{role:"assistant",text:"عذراً، حاول مرة ثانية!",products:[]}]);}
     setLoading(false);
   };
